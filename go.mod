@@ -1,4 +1,4 @@
-module che4web/go4rest
+module github.com/che4web/go4rest
 
 go 1.24.2
 
