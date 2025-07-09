@@ -77,7 +77,7 @@ func (c *ViewSet[T]) Update(ctx *gin.Context) {
 		return
 	}
 
-	if err := c.db.Save(&item).Error; err != nil {
+	if err := c.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(&item).Error; err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
