@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	//"fmt"
-
+	"github.com/invopop/jsonschema"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -134,3 +134,16 @@ func (c *ViewSet[T]) List(ctx *gin.Context) {
     response:=p.GetResponse(items)
 	ctx.JSON(http.StatusOK, response)
 }
+// Schema возвращает запись по ID
+func (c *ViewSet[T]) Schema(ctx *gin.Context) {
+	var item T
+	
+	reflector := &jsonschema.Reflector{
+	        AllowAdditionalProperties:  false,
+        	RequiredFromJSONSchemaTags: true,
+			ExpandedStruct:true,
+	}
+    schema := reflector.Reflect(item)
+	ctx.JSON(http.StatusOK, schema)
+}
+

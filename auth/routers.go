@@ -12,7 +12,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	// Настройка сессий
 	db.AutoMigrate(&User{})
 	store := cookie.NewStore([]byte("secret"))
-	r.Use(sessions.Sessions("mysession", store))
+	r.Use(sessions.Sessions("session_id", store))
 
 	// Инициализация обработчиков
 	authHandler := NewAuthHandler(db)
