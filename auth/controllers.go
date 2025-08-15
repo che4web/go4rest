@@ -1,0 +1,111 @@
+package auth
+
+import (
+	"net/http"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"github.com/gin-contrib/sessions"
+)
+
+type AuthHandler struct {
+	DB *gorm.DB
+}
+
+func NewAuthHandler(db *gorm.DB) *AuthHandler {
+	return &AuthHandler{DB: db}
+}
+
+// Register обрабатывает регистрацию пользователя
+func (h *AuthHandler) Register(c *gin.Context) {
+	var user User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Хешируем пароль
+	if err := user.HashPassword(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
+		return
+	}
+
+	// Сохраняем пользователя в БД
+	if err := h.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
+}
+
+// Login обрабатывает вход пользователя
+func (h *AuthHandler) Login(c *gin.Context) {
+	var input struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Ищем пользователя в БД
+	var user User
+	if err := h.DB.Where("username = ?", input.Username).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	// Проверяем пароль
+	if !user.CheckPassword(input.Password) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	// Сохраняем пользователя в сессии
+	session := sessions.Default(c)
+	session.Set("user_id", user.ID)
+	session.Set("username", user.Username)
+	if err := session.Save(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Logged in successfully"})
+}
+
+// Logout обрабатывает выход пользователя
+func (h *AuthHandler) Logout(c *gin.Context) {
+	session := sessions.Default(c)
+	session.Clear()
+	session.Options(sessions.Options{MaxAge: -1}) // Удаляем cookie
+	if err := session.Save(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// Profile возвращает информацию о текущем пользователе
+func (h *AuthHandler) Profile(c *gin.Context) {
+	session := sessions.Default(c)
+	userID := session.Get("user_id")
+	if userID == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+
+	var user User
+	if err := h.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":       user.ID,
+		"username": user.Username,
+		"created_at": user.CreatedAt,
+	})
+}
