@@ -5,10 +5,16 @@ import (
 	"gorm.io/gorm"
 )
 
+type Role struct {
+	gorm.Model
+	Name string `gorm:"unique;not null"`
+}
+
 type User struct {
 	gorm.Model
 	Username string `gorm:"unique;not null"`
 	Password string `gorm:"not null"`
+	Role Role `gorm:"not null"`
 }
 
 // HashPassword хеширует пароль перед сохранением

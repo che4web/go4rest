@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"github.com/gin-contrib/sessions"
+	"github.com/che4web/go4rest"
 )
 
 type AuthHandler struct {
@@ -88,8 +89,8 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-// Profile возвращает информацию о текущем пользователе
-func (h *AuthHandler) Profile(c *gin.Context) {
+// WhoI возвращает информацию о текущем пользователе
+func (h *AuthHandler) WhoI(c *gin.Context) {
 	session := sessions.Default(c)
 	userID := session.Get("user_id")
 	if userID == nil {
@@ -106,6 +107,33 @@ func (h *AuthHandler) Profile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id":       user.ID,
 		"username": user.Username,
+		"role": user.Role,
 		"created_at": user.CreatedAt,
 	})
+}
+
+type UserController struct {
+	*go4rest.ViewSet[User]
+	db *gorm.DB
+}
+
+func NewUserController(db *gorm.DB) *UserController{
+	vw :=go4rest.NewViewSet[User](db)
+	return &UserController{
+		ViewSet: vw,
+		db:         db,
+	}
+}
+
+type RoleController struct {
+	*go4rest.ViewSet[Role]
+	db *gorm.DB
+}
+
+func NewRoleController(db *gorm.DB) *RoleController{
+	vw :=go4rest.NewViewSet[Role](db)
+	return &RoleController{
+		ViewSet: vw,
+		db:         db,
+	}
 }

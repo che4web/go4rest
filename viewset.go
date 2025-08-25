@@ -134,6 +134,22 @@ func (c *ViewSet[T]) List(ctx *gin.Context) {
     response:=p.GetResponse(items)
 	ctx.JSON(http.StatusOK, response)
 }
+// Full возвращает список записей без учета пагинации
+func (c *ViewSet[T]) Full(ctx *gin.Context) {
+	var items []T
+	
+	query := c.db.Model(&items)
+	query = c.GetQueryset(query)
+	queryParams := ctx.Request.URL.Query()
+	f := ParseQueryParams(queryParams)
+	query = ApplyFilters(query,f)
+    
+	if err := query.Find(&items).Error; err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+	}
+	ctx.JSON(http.StatusOK, items)
+}
 // Schema возвращает запись по ID
 func (c *ViewSet[T]) Schema(ctx *gin.Context) {
 	var item T
