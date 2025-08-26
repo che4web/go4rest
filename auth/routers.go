@@ -42,7 +42,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		api2.DELETE("/:id/", userController.Delete)
 	}
 
-	roleController := NewUserController(db)
+	roleController := NewRoleController(db)
 	api3 := r.Group("/api/user_role")
 	{
 		api3.GET("/", roleController.List)
