@@ -10,8 +10,8 @@ import (
 
 func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	// Настройка сессий
-	db.AutoMigrate(&User{})
 	db.AutoMigrate(&Role{})
+	db.AutoMigrate(&User{})
 	store := cookie.NewStore([]byte("secret"))
 	r.Use(sessions.Sessions("session_id", store))
 
