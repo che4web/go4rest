@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"fmt"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
