@@ -25,12 +25,12 @@ func NewPaginator(ctx *gin.Context) Pagination{
 		page = 1
 	}
 
-	perPage, _ := strconv.Atoi(ctx.DefaultQuery("per_page", "10"))
+	perPage, _ := strconv.Atoi(ctx.DefaultQuery("per_page", "30"))
 	switch {
 	    case perPage > 100:
 		    perPage = 100
 	    case perPage <= 0:
-		    perPage = 10
+		    perPage = 30
 	}
 
     return Pagination{

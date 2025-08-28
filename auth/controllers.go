@@ -99,7 +99,7 @@ func (h *AuthHandler) WhoI(c *gin.Context) {
 	}
 
 	var user User
-	if err := h.DB.First(&user, userID).Error; err != nil {
+	if err := h.DB.Preload("Role").First(&user, userID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -119,9 +119,10 @@ type UserController struct {
 
 func NewUserController(db *gorm.DB) *UserController{
 	vw :=go4rest.NewViewSet[User](db)
+	vw.PreloadField = []string{"Role"}
 	return &UserController{
 		ViewSet: vw,
-		db:         db,
+		db:      db,
 	}
 }
 
@@ -134,6 +135,6 @@ func NewRoleController(db *gorm.DB) *RoleController{
 	vw :=go4rest.NewViewSet[Role](db)
 	return &RoleController{
 		ViewSet: vw,
-		db:         db,
+		db:      db,
 	}
 }
