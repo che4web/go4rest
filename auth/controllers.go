@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 	"github.com/gin-contrib/sessions"
 	"github.com/che4web/go4rest"
+	"fmt"
 )
 
 type AuthHandler struct {
@@ -18,10 +19,19 @@ func NewAuthHandler(db *gorm.DB) *AuthHandler {
 
 // Register обрабатывает регистрацию пользователя
 func (h *AuthHandler) Register(c *gin.Context) {
-	var user User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var input struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	user:=User{
+		Username:input.Username,
+		Password:input.Password,
 	}
 
 	// Хешируем пароль
@@ -59,6 +69,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Проверяем пароль
+	fmt.Printf("user name: %v, pass %v, db hash %v",user.Username,input.Password, user.Password)
 	if !user.CheckPassword(input.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return

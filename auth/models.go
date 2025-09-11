@@ -3,6 +3,7 @@ package auth
 import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"fmt"
 )
 
 type Role struct {
@@ -25,11 +26,15 @@ func (u *User) HashPassword() error {
 		return err
 	}
 	u.Password = string(hashedPassword)
+	fmt.Printf("HashPassword %v",hashedPassword)
 	return nil
 }
 
 // CheckPassword проверяет соответствие пароля хешу
 func (u *User) CheckPassword(password string) bool {
+
+	fmt.Printf("\n u.Password : %v ; passwoed;%v \n",u.Password,password)
 	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+	fmt.Printf("err : %v",err)
 	return err == nil
 }
