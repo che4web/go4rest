@@ -14,6 +14,15 @@ type FilterOptions struct {
 	Operator string // "eq", "ne", "gt", "lt", "gte", "lte", "like"
 }
 
+type SortOptions struct {
+	Field string
+	Order string // "asc", "desc"
+}
+type QueryOptions struct {
+	Filters []FilterOptions
+	Sorts   []SortOptions
+}
+
 func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 	for _, filter := range filters {
 		switch filter.Operator {
@@ -38,13 +47,41 @@ func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 	}
 	return db
 }
+func ApplySorting(db *gorm.DB, sorts []SortOptions) *gorm.DB {
+	for _, sort := range sorts {
+		order := strings.ToUpper(sort.Order)
+		if order != "ASC" && order != "DESC" {
+			order = "ASC" // значение по умолчанию
+		}
+		db = db.Order(fmt.Sprintf("%s %s", sort.Field, order))
+	}
+	return db
+}
 
 // ParseQueryParams преобразует query-параметры в фильтры
-func ParseQueryParams(params url.Values) []FilterOptions {
+func ParseQueryParams(params url.Values) QueryOptions {
 	var filters []FilterOptions
+	var sorts []SortOptions
 
 	for key, values := range params {
 		// Берем первое значение (игнорируем multiple values)
+		if key=="ordering"{
+			var ordering string
+			var f string
+			if  values[0][0:1]=="-"{
+				ordering = "DESC"
+				f= values[0][1:]
+			}else{
+				ordering = "ASC"
+				f= values[0]
+			}
+			sort:= SortOptions{
+				Order:ordering,
+				Field:f,
+			}
+			sorts = append(sorts,sort)
+			continue
+		}
 
 		value := values[0]
 		fmt.Printf(" all %+v %+v\n",key,value)
@@ -90,7 +127,10 @@ func ParseQueryParams(params url.Values) []FilterOptions {
 		}
 	}
 
-	return filters
+	return QueryOptions{
+		Filters:filters,
+		Sorts:sorts,
+	}
 }
 
 // tryParseValue пытается преобразовать строку в соответствующий тип

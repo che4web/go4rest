@@ -123,7 +123,8 @@ func (c *ViewSet[T]) List(ctx *gin.Context) {
 	query = c.GetQueryset(query)
 	queryParams := ctx.Request.URL.Query()
 	f := ParseQueryParams(queryParams)
-	query = ApplyFilters(query,f)
+	query = ApplyFilters(query,f.Filters)
+	query = ApplySorting(query,f.Sorts)
     
 	query = p.PaginatedQueryset(query)
 	 if err := query.Find(&items).Error; err != nil {
@@ -142,7 +143,8 @@ func (c *ViewSet[T]) Full(ctx *gin.Context) {
 	query = c.GetQueryset(query)
 	queryParams := ctx.Request.URL.Query()
 	f := ParseQueryParams(queryParams)
-	query = ApplyFilters(query,f)
+	query = ApplyFilters(query,f.Filters)
+	query = ApplySorting(query,f.Sorts)
     
 	if err := query.Find(&items).Error; err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
