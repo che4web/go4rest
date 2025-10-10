@@ -4,9 +4,10 @@ package go4rest
 import (
 	"net/http"
 	"strconv"
+
 	//"fmt"
-	"github.com/invopop/jsonschema"
 	"github.com/gin-gonic/gin"
+	"github.com/invopop/jsonschema"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +16,7 @@ type Model interface {
 }
 
 type ViewSet[T any] struct {
-	db *gorm.DB
+	db           *gorm.DB
 	PreloadField []string
 }
 
@@ -48,7 +49,7 @@ func (c *ViewSet[T]) GetByID(ctx *gin.Context) {
 	}
 
 	var item T
-	
+
 	query := c.GetQueryset(c.db)
 	if err := query.First(&item, id).Error; err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "record not found"})
@@ -109,59 +110,61 @@ func (c *ViewSet[T]) Delete(ctx *gin.Context) {
 }
 
 func (c *ViewSet[T]) GetQueryset(query *gorm.DB) *gorm.DB {
-	for _,f := range c.PreloadField{
+	for _, f := range c.PreloadField {
 		query = query.Preload(f)
 	}
 	return query
 }
+
 // List возвращает список записей с пагинацией
 func (c *ViewSet[T]) List(ctx *gin.Context) {
 	var items []T
-    p:= NewPaginator(ctx)
-	
+	p := NewPaginator(ctx)
+
 	query := c.db.Model(&items)
 	query = c.GetQueryset(query)
 	queryParams := ctx.Request.URL.Query()
 	f := ParseQueryParams(queryParams)
-	query = ApplyFilters(query,f.Filters)
-	query = ApplySorting(query,f.Sorts)
-    
+	query = ApplyFilters(query, f.Filters)
+	query = ApplySorting(query, f.Sorts)
+
 	query = p.PaginatedQueryset(query)
-	 if err := query.Find(&items).Error; err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+	if err := query.Find(&items).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-    
-    response:=p.GetResponse(items)
+
+	response := p.GetResponse(items)
 	ctx.JSON(http.StatusOK, response)
 }
+
 // Full возвращает список записей без учета пагинации
 func (c *ViewSet[T]) Full(ctx *gin.Context) {
 	var items []T
-	
+
 	query := c.db.Model(&items)
 	query = c.GetQueryset(query)
 	queryParams := ctx.Request.URL.Query()
 	f := ParseQueryParams(queryParams)
-	query = ApplyFilters(query,f.Filters)
-	query = ApplySorting(query,f.Sorts)
-    
+	query = ApplyFilters(query, f.Filters)
+	query = ApplySorting(query, f.Sorts)
+
 	if err := query.Find(&items).Error; err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	ctx.JSON(http.StatusOK, items)
 }
+
 // Schema возвращает запись по ID
 func (c *ViewSet[T]) Schema(ctx *gin.Context) {
 	var item T
-	
+
 	reflector := &jsonschema.Reflector{
-	        AllowAdditionalProperties:  false,
-        	RequiredFromJSONSchemaTags: true,
-			ExpandedStruct:true,
+		AllowAdditionalProperties:  false,
+		RequiredFromJSONSchemaTags: true,
+		ExpandedStruct:             true,
 	}
-    schema := reflector.Reflect(item)
+	schema := reflector.Reflect(item)
 	ctx.JSON(http.StatusOK, schema)
 }
-

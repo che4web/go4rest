@@ -1,12 +1,26 @@
 package go4rest
 
 import (
-	"gorm.io/gorm"
-	"strings"
 	"fmt"
 	"net/url"
+	"reflect"
+	"regexp"
 	"strconv"
+	"strings"
+
+	"gorm.io/gorm"
 )
+
+var (
+	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
+)
+
+func ToSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
+}
 
 type FilterOptions struct {
 	Field    string
@@ -23,12 +37,43 @@ type QueryOptions struct {
 	Sorts   []SortOptions
 }
 
+func hasField(s interface{}, fieldName string) bool {
+	t := reflect.TypeOf(s)
+
+	// Если передали указатель, получаем тип элемента
+	//
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// Проверяем, что это структура
+	t = t.Elem()
+
+	// Ищем поле по имени
+	_, found := t.FieldByNameFunc(func(n string) bool {
+		fmt.Printf("IN====== %s,%s\n", ToSnakeCase(n), fieldName)
+		return ToSnakeCase(n) == fieldName
+	})
+	return found
+}
+
+func checkIdField(model interface{}, fieldName string) string {
+	name := fmt.Sprintf("%s_id", fieldName)
+	fmt.Print("checkIdField")
+	if hasField(model, name) {
+		return fmt.Sprintf("%s_id", fieldName)
+	} else {
+		return fieldName
+	}
+}
+
 func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 	for _, filter := range filters {
+		fieldName := checkIdField(db.Statement.Model, filter.Field)
 		switch filter.Operator {
 		case "eq":
-			db = db.Where(fmt.Sprintf("%s = ?", filter.Field), filter.Value)
-			fmt.Printf("%s = ?", filter.Field,filter.Value)
+			db = db.Where(fmt.Sprintf("%s = ?", fieldName), filter.Value)
+			fmt.Printf("QUERY %s = ?", fieldName)
 		case "ne":
 			db = db.Where(fmt.Sprintf("%s != ?", filter.Field), filter.Value)
 		case "gt":
@@ -47,6 +92,7 @@ func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 	}
 	return db
 }
+
 func ApplySorting(db *gorm.DB, sorts []SortOptions) *gorm.DB {
 	for _, sort := range sorts {
 		order := strings.ToUpper(sort.Order)
@@ -65,34 +111,34 @@ func ParseQueryParams(params url.Values) QueryOptions {
 
 	for key, values := range params {
 		// Берем первое значение (игнорируем multiple values)
-		if key=="ordering"{
+		if key == "ordering" {
 			var ordering string
 			var f string
-			if  values[0][0:1]=="-"{
+			if values[0][0:1] == "-" {
 				ordering = "DESC"
-				f= values[0][1:]
-			}else{
+				f = values[0][1:]
+			} else {
 				ordering = "ASC"
-				f= values[0]
+				f = values[0]
 			}
-			sort:= SortOptions{
-				Order:ordering,
-				Field:f,
+			sort := SortOptions{
+				Order: ordering,
+				Field: f,
 			}
-			sorts = append(sorts,sort)
+			sorts = append(sorts, sort)
 			continue
 		}
 
 		value := values[0]
-		fmt.Printf(" all %+v %+v\n",key,value)
-		if key=="page"{
+		fmt.Printf(" all %+v %+v\n", key, value)
+		if key == "page" {
 			continue
 		}
 		if len(value) == 0 || value == "" {
-			fmt.Printf(" continue %+v %+v\n",key,value)
+			fmt.Printf(" continue %+v %+v\n", key, value)
 			continue
 		}
-		if len(values)>1{
+		if len(values) > 1 {
 			filters = append(filters, FilterOptions{
 				Field:    key,
 				Value:    values,
@@ -100,9 +146,6 @@ func ParseQueryParams(params url.Values) QueryOptions {
 			})
 			continue
 		}
-
-
-
 
 		parts := strings.Split(key, "__")
 		if len(parts) == 1 {
@@ -114,9 +157,9 @@ func ParseQueryParams(params url.Values) QueryOptions {
 			})
 		} else {
 			var processedValue interface{}
-			if parts[1]=="like"{
-				processedValue=value
-			}else{
+			if parts[1] == "like" {
+				processedValue = value
+			} else {
 				processedValue = tryParseValue(value)
 			}
 			filters = append(filters, FilterOptions{
@@ -128,8 +171,8 @@ func ParseQueryParams(params url.Values) QueryOptions {
 	}
 
 	return QueryOptions{
-		Filters:filters,
-		Sorts:sorts,
+		Filters: filters,
+		Sorts:   sorts,
 	}
 }
 
@@ -139,17 +182,17 @@ func tryParseValue(value string) interface{} {
 	if b, err := strconv.ParseBool(value); err == nil {
 		return b
 	}
-	
+
 	// Пробуем int
 	if i, err := strconv.Atoi(value); err == nil {
 		return i
 	}
-	
+
 	// Пробуем float
 	if f, err := strconv.ParseFloat(value, 64); err == nil {
 		return f
 	}
-	
+
 	// Возвращаем как строку
 	return value
 }
