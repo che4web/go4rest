@@ -51,7 +51,6 @@ func hasField(s interface{}, fieldName string) bool {
 
 	// Ищем поле по имени
 	_, found := t.FieldByNameFunc(func(n string) bool {
-		fmt.Printf("IN====== %s,%s\n", ToSnakeCase(n), fieldName)
 		return ToSnakeCase(n) == fieldName
 	})
 	return found
@@ -59,7 +58,6 @@ func hasField(s interface{}, fieldName string) bool {
 
 func checkIdField(model interface{}, fieldName string) string {
 	name := fmt.Sprintf("%s_id", fieldName)
-	fmt.Print("checkIdField")
 	if hasField(model, name) {
 		return fmt.Sprintf("%s_id", fieldName)
 	} else {
@@ -73,7 +71,6 @@ func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 		switch filter.Operator {
 		case "eq":
 			db = db.Where(fmt.Sprintf("%s = ?", fieldName), filter.Value)
-			fmt.Printf("QUERY %s = ?", fieldName)
 		case "ne":
 			db = db.Where(fmt.Sprintf("%s != ?", filter.Field), filter.Value)
 		case "gt":
