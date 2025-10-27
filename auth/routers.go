@@ -1,7 +1,6 @@
 package auth
 
 import (
-
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -13,6 +12,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	db.AutoMigrate(&Role{})
 	db.AutoMigrate(&User{})
 	store := cookie.NewStore([]byte("secret"))
+	store.Options(sessions.Options{
+		Secure: false,
+	})
 	r.Use(sessions.Sessions("session_id", store))
 
 	// Инициализация обработчиков
@@ -23,11 +25,11 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	{
 		api.POST("/register", authHandler.Register)
 		api.POST("/login", authHandler.Login)
-		
+
 		auth := api.Group("/")
 		auth.Use(AuthRequired())
 		{
-			auth.GET("/who_i", authHandler.	WhoI)
+			auth.GET("/who_i", authHandler.WhoI)
 			auth.POST("/logout", authHandler.Logout)
 		}
 	}
@@ -51,5 +53,4 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		api3.PUT("/:id/", roleController.Update)
 		api3.DELETE("/:id/", roleController.Delete)
 	}
-
 }
