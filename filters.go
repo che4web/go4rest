@@ -176,9 +176,6 @@ func ParseQueryParams(params url.Values) QueryOptions {
 // tryParseValue пытается преобразовать строку в соответствующий тип
 func tryParseValue(value string) interface{} {
 	// Пробуем bool
-	if b, err := strconv.ParseBool(value); err == nil {
-		return b
-	}
 
 	// Пробуем int
 	if i, err := strconv.Atoi(value); err == nil {
@@ -188,6 +185,9 @@ func tryParseValue(value string) interface{} {
 	// Пробуем float
 	if f, err := strconv.ParseFloat(value, 64); err == nil {
 		return f
+	}
+	if b, err := strconv.ParseBool(value); err == nil {
+		return b
 	}
 
 	// Возвращаем как строку
