@@ -23,6 +23,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	var input struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
+		RoleID   uint   `json:"role_id"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -33,6 +34,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	user := User{
 		Username: input.Username,
 		Password: input.Password,
+		RoleID:   input.RoleID,
 	}
 
 	// Хешируем пароль
