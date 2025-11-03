@@ -124,10 +124,9 @@ func (h *AuthHandler) WhoI(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":         user.ID,
-		"username":   user.Username,
-		"role":       user.Role,
-		"created_at": user.CreatedAt,
+		"id":       user.ID,
+		"username": user.Username,
+		"role":     user.Role,
 	})
 }
 
