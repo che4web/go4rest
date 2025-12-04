@@ -95,6 +95,12 @@ func (c *ViewSet[T]) Delete(ctx *gin.Context) {
 	}
 
 	var item T
+
+	if err := c.db.First(&item, id).Error; err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "record not found"})
+		return
+	}
+
 	result := c.db.Delete(&item, id)
 	if result.Error != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
