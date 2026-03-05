@@ -85,6 +85,12 @@ func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 			db = db.Where(fmt.Sprintf("%s LIKE ?", filter.Field), "%"+filter.Value.(string)+"%")
 		case "in":
 			db = db.Where(fmt.Sprintf("%s in ?", filter.Field), filter.Value)
+		case "isnull":
+			if b, ok := filter.Value.(bool); ok && b {
+				db = db.Where(fmt.Sprintf("%s IS NULL", fieldName))
+			} else {
+				db = db.Where(fmt.Sprintf("%s IS NOT NULL", fieldName))
+			}
 		}
 	}
 	return db
