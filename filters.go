@@ -137,6 +137,10 @@ func ParseQueryParams(params url.Values) QueryOptions {
 		if key == "page" {
 			continue
 		}
+
+		if key == "per_page" {
+			continue
+		}
 		if len(value) == 0 || value == "" {
 			fmt.Printf(" continue %+v %+v\n", key, value)
 			continue
