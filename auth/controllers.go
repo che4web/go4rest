@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/che4web/go4rest"
@@ -23,7 +22,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	var input struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
-		RoleID   uint   `json:"role_id"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -34,7 +32,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	user := User{
 		Username: input.Username,
 		Password: input.Password,
-		RoleID:   input.RoleID,
 	}
 
 	// Хешируем пароль
@@ -72,7 +69,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Проверяем пароль
-	fmt.Printf("user name: %v, pass %v, db hash %v", user.Username, input.Password, user.Password)
 	if !user.CheckPassword(input.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
@@ -97,8 +93,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	session.Delete("username")
 	session.Clear()
 	// session.Options(sessions.Options{MaxAge: -1}) // Удаляем cookie
-	session.Save()
-	fmt.Printf("session %v+", session)
 	if err := session.Save(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
 		return
@@ -111,22 +105,23 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) WhoI(c *gin.Context) {
 	session := sessions.Default(c)
 	userID := session.Get("user_id")
-	fmt.Printf("user whoI %v", userID)
 	if userID == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
 
 	var user User
-	if err := h.DB.Preload("Role").First(&user, userID).Error; err != nil {
+	if err := h.DB.Preload("Roles.Permissions").Preload("Permissions").First(&user, userID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":       user.ID,
-		"username": user.Username,
-		"role":     user.Role,
+		"id":           user.ID,
+		"username":     user.Username,
+		"roles":        user.Roles,
+		"permissions":  user.Permissions,
+		"is_superuser": user.IsSuperuser,
 	})
 }
 
@@ -136,8 +131,8 @@ type UserController struct {
 }
 
 func NewUserController(db *gorm.DB) *UserController {
-	vw := go4rest.NewViewSet[User](db)
-	vw.PreloadField = []string{"Role"}
+	vw := go4rest.NewViewSet[User](db, ModelPermissions("auth.user"))
+	vw.PreloadField = []string{"Roles", "Permissions"}
 	return &UserController{
 		ViewSet: vw,
 		db:      db,
@@ -150,7 +145,8 @@ type RoleController struct {
 }
 
 func NewRoleController(db *gorm.DB) *RoleController {
-	vw := go4rest.NewViewSet[Role](db)
+	vw := go4rest.NewViewSet[Role](db, ModelPermissions("auth.role"))
+	vw.PreloadField = []string{"Permissions"}
 	return &RoleController{
 		ViewSet: vw,
 		db:      db,

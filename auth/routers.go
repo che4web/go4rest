@@ -1,19 +1,41 @@
 package auth
 
 import (
+	"crypto/rand"
+	"net/http"
+
+	"github.com/che4web/go4rest"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
+// RegisterRoutes accepts an optional persistent signing key (at least 32 bytes).
+// Without a key, sessions are valid only for the lifetime of this process.
+func RegisterRoutes(r *gin.Engine, db *gorm.DB, signingKey ...[]byte) {
 	// Настройка сессий
-	db.AutoMigrate(&Role{})
-	db.AutoMigrate(&User{})
-	store := cookie.NewStore([]byte("secret"))
+	if err := Migrate(db); err != nil {
+		panic(err)
+	}
+	key := make([]byte, 32)
+	if len(signingKey) > 1 {
+		panic("provide at most one session signing key")
+	}
+	if len(signingKey) == 1 {
+		if len(signingKey[0]) < 32 {
+			panic("session signing key must contain at least 32 bytes")
+		}
+		key = signingKey[0]
+	} else if _, err := rand.Read(key); err != nil {
+		panic(err)
+	}
+	store := cookie.NewStore(key)
 	store.Options(sessions.Options{
-		Secure: false,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   false,
 	})
 	r.Use(sessions.Sessions("session_id", store))
 
@@ -33,6 +55,13 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			auth.POST("/logout", authHandler.Logout)
 		}
 	}
+	permissionController := go4rest.NewViewSet[Permission](db, ModelPermissions("auth.permission"))
+	api.GET("/permissions", permissionController.Full)
+	api.POST("/role_assignments", authHandler.SetRole)
+	api.DELETE("/role_assignments", authHandler.SetRole)
+	api.POST("/permission_assignments", authHandler.SetPermission)
+	api.DELETE("/permission_assignments", authHandler.SetPermission)
+	api.GET("/object_permissions", authHandler.ObjectPermissions)
 
 	userController := NewUserController(db)
 	api2 := r.Group("/api/user")

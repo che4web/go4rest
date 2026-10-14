@@ -3,12 +3,12 @@ package go4rest
 import (
 	"fmt"
 	"net/url"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -37,59 +37,50 @@ type QueryOptions struct {
 	Sorts   []SortOptions
 }
 
-func hasField(s interface{}, fieldName string) bool {
-	t := reflect.TypeOf(s)
-
-	// Если передали указатель, получаем тип элемента
-	//
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+func queryColumn(db *gorm.DB, name string) (clause.Column, error) {
+	stmt := &gorm.Statement{DB: db}
+	if err := stmt.Parse(db.Statement.Model); err != nil {
+		return clause.Column{}, err
 	}
-
-	// Проверяем, что это структура
-	t = t.Elem()
-
-	// Ищем поле по имени
-	_, found := t.FieldByNameFunc(func(n string) bool {
-		return ToSnakeCase(n) == fieldName
-	})
-	return found
-}
-
-func checkIdField(model interface{}, fieldName string) string {
-	name := fmt.Sprintf("%s_id", fieldName)
-	if hasField(model, name) {
-		return fmt.Sprintf("%s_id", fieldName)
-	} else {
-		return fieldName
+	field := stmt.Schema.LookUpField(name)
+	if field == nil {
+		field = stmt.Schema.LookUpField(name + "_id")
 	}
+	if field == nil || field.DBName == "" || field.Tag.Get("json") == "-" {
+		return clause.Column{}, fmt.Errorf("invalid query field %q", name)
+	}
+	return clause.Column{Table: clause.CurrentTable, Name: field.DBName}, nil
 }
 
 func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 	for _, filter := range filters {
-		fieldName := checkIdField(db.Statement.Model, filter.Field)
+		column, err := queryColumn(db, filter.Field)
+		if err != nil {
+			db.AddError(err)
+			return db
+		}
 		switch filter.Operator {
 		case "eq":
-			db = db.Where(fmt.Sprintf("%s = ?", fieldName), filter.Value)
+			db = db.Where(clause.Eq{Column: column, Value: filter.Value})
 		case "ne":
-			db = db.Where(fmt.Sprintf("%s != ?", filter.Field), filter.Value)
+			db = db.Where(clause.Neq{Column: column, Value: filter.Value})
 		case "gt":
-			db = db.Where(fmt.Sprintf("%s > ?", filter.Field), filter.Value)
+			db = db.Where(clause.Gt{Column: column, Value: filter.Value})
 		case "lt":
-			db = db.Where(fmt.Sprintf("%s < ?", filter.Field), filter.Value)
+			db = db.Where(clause.Lt{Column: column, Value: filter.Value})
 		case "gte":
-			db = db.Where(fmt.Sprintf("%s >= ?", filter.Field), filter.Value)
+			db = db.Where(clause.Gte{Column: column, Value: filter.Value})
 		case "lte":
-			db = db.Where(fmt.Sprintf("%s <= ?", filter.Field), filter.Value)
+			db = db.Where(clause.Lte{Column: column, Value: filter.Value})
 		case "like":
-			db = db.Where(fmt.Sprintf("%s LIKE ?", filter.Field), "%"+filter.Value.(string)+"%")
+			db = db.Where(clause.Like{Column: column, Value: "%" + fmt.Sprint(filter.Value) + "%"})
 		case "in":
-			db = db.Where(fmt.Sprintf("%s in ?", filter.Field), filter.Value)
+			db = db.Where(clause.Expr{SQL: "? IN (?)", Vars: []interface{}{column, filter.Value}})
 		case "isnull":
 			if b, ok := filter.Value.(bool); ok && b {
-				db = db.Where(fmt.Sprintf("%s IS NULL", fieldName))
+				db = db.Where(clause.Eq{Column: column, Value: nil})
 			} else {
-				db = db.Where(fmt.Sprintf("%s IS NOT NULL", fieldName))
+				db = db.Where(clause.Neq{Column: column, Value: nil})
 			}
 		}
 	}
@@ -98,11 +89,16 @@ func ApplyFilters(db *gorm.DB, filters []FilterOptions) *gorm.DB {
 
 func ApplySorting(db *gorm.DB, sorts []SortOptions) *gorm.DB {
 	for _, sort := range sorts {
+		column, err := queryColumn(db, sort.Field)
+		if err != nil {
+			db.AddError(err)
+			return db
+		}
 		order := strings.ToUpper(sort.Order)
 		if order != "ASC" && order != "DESC" {
 			order = "ASC" // значение по умолчанию
 		}
-		db = db.Order(fmt.Sprintf("%s %s", sort.Field, order))
+		db = db.Order(clause.OrderByColumn{Column: column, Desc: order == "DESC"})
 	}
 	return db
 }
@@ -113,6 +109,9 @@ func ParseQueryParams(params url.Values) QueryOptions {
 	var sorts []SortOptions
 
 	for key, values := range params {
+		if len(values) == 0 || values[0] == "" {
+			continue
+		}
 		// Берем первое значение (игнорируем multiple values)
 		if key == "ordering" {
 			var ordering string
@@ -133,7 +132,6 @@ func ParseQueryParams(params url.Values) QueryOptions {
 		}
 
 		value := values[0]
-		fmt.Printf(" all %+v %+v\n", key, value)
 		if key == "page" {
 			continue
 		}
@@ -142,7 +140,6 @@ func ParseQueryParams(params url.Values) QueryOptions {
 			continue
 		}
 		if len(value) == 0 || value == "" {
-			fmt.Printf(" continue %+v %+v\n", key, value)
 			continue
 		}
 		if len(values) > 1 {
